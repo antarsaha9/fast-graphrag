@@ -186,6 +186,7 @@ class DefaultStateManagerService(BaseStateManagerService[TEntity, TRelation, THa
         self, query: str, entities: Dict[str, List[str]]
     ) -> Optional[TContext[TEntity, TRelation, THash, TChunk]]:
         if self.entity_storage.size == 0:
+            logger.error('entity storage is empty')
             return None
 
         try:

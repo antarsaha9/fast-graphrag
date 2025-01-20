@@ -123,7 +123,8 @@ class OpenAILLMService(BaseLLMService):
 
         return llm_response, messages
 
-
+MAX_CONCURRENT_REQUESTS = 5
+semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
 @dataclass
 class OpenAIEmbeddingService(BaseEmbeddingService):
     """Base class for Language Model implementations."""
@@ -181,4 +182,5 @@ class OpenAIEmbeddingService(BaseEmbeddingService):
         retry=retry_if_exception_type((RateLimitError, APIConnectionError, TimeoutError)),
     )
     async def _embedding_request(self, input: List[str], model: str) -> Any:
-        return await self.embedding_async_client.embeddings.create(model=model, input=input, encoding_format="float")
+        async with semaphore:
+            return await self.embedding_async_client.embeddings.create(model=model, input=input, encoding_format="float")
