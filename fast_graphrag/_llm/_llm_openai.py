@@ -24,7 +24,19 @@ from fast_graphrag._utils import logger, throttle_async_func_call
 from ._base import BaseEmbeddingService, BaseLLMService, T_model
 
 TIMEOUT_SECONDS = 180.0
+_MAX_CONCURRENT_EMBEDDING_REQUESTS = os.getenv('MAX_CONCURRENT_EMBEDDING_REQUESTS')
+if _MAX_CONCURRENT_EMBEDDING_REQUESTS is not None and _MAX_CONCURRENT_EMBEDDING_REQUESTS.isdigit():
+    max_concurrent_embedding_requests = int(_MAX_CONCURRENT_EMBEDDING_REQUESTS)
+else:
+    max_concurrent_embedding_requests = 5
+EMBEDDING_SEMAPHORE = asyncio.Semaphore(max_concurrent_embedding_requests)
 
+_MAX_CONCURRENT_LLM_REQUESTS = os.getenv('MAX_CONCURRENT_LLM_REQUESTS')
+if _MAX_CONCURRENT_LLM_REQUESTS is not None and _MAX_CONCURRENT_LLM_REQUESTS.isdigit():
+    max_concurrent_llm_requests = int(_MAX_CONCURRENT_LLM_REQUESTS)
+else:
+    max_concurrent_llm_requests = 5
+LLM_SEMAPHORE = asyncio.Semaphore(max_concurrent_llm_requests)
 
 @dataclass
 class OpenAILLMService(BaseLLMService):
@@ -96,15 +108,16 @@ class OpenAILLMService(BaseLLMService):
 
         messages.append({"role": "user", "content": prompt})
 
-        llm_response: T_model = await self.llm_async_client.chat.completions.create(
-            model=model,
-            messages=messages,  # type: ignore
-            response_model=response_model.Model
-            if response_model and issubclass(response_model, BaseModelAlias)
-            else response_model,
-            **kwargs,
-            max_retries=AsyncRetrying(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)),
-        )
+        async with LLM_SEMAPHORE:
+            llm_response: T_model = await self.llm_async_client.chat.completions.create(
+                model=model,
+                messages=messages,  # type: ignore
+                response_model=response_model.Model
+                if response_model and issubclass(response_model, BaseModelAlias)
+                else response_model,
+                **kwargs,
+                max_retries=AsyncRetrying(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)),
+            )
 
         if not llm_response:
             logger.error("No response received from the language model.")
@@ -123,8 +136,7 @@ class OpenAILLMService(BaseLLMService):
 
         return llm_response, messages
 
-MAX_CONCURRENT_REQUESTS = 5
-semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+
 @dataclass
 class OpenAIEmbeddingService(BaseEmbeddingService):
     """Base class for Language Model implementations."""
@@ -182,5 +194,5 @@ class OpenAIEmbeddingService(BaseEmbeddingService):
         retry=retry_if_exception_type((RateLimitError, APIConnectionError, TimeoutError)),
     )
     async def _embedding_request(self, input: List[str], model: str) -> Any:
-        async with semaphore:
+        async with EMBEDDING_SEMAPHORE:
             return await self.embedding_async_client.embeddings.create(model=model, input=input, encoding_format="float")
