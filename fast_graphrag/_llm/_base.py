@@ -5,6 +5,7 @@ from typing import Any, Optional, Tuple, Type, TypeVar, Union
 
 import numpy as np
 from pydantic import BaseModel
+from openai.types.chat.chat_completion import ChatCompletion
 
 from fast_graphrag._models import BaseModelAlias
 from fast_graphrag._prompt import PROMPTS
@@ -16,9 +17,9 @@ async def format_and_send_prompt(
     prompt_key: str,
     llm: "BaseLLMService",
     format_kwargs: dict[str, Any],
-    response_model: Type[T_model],
+    response_model: Type[T_model] | None = None,
     **args: Any,
-) -> Tuple[T_model, list[dict[str, str]]]:
+) -> Tuple[Union[T_model, ChatCompletion], list[dict[str, str]]]:
     """Get a prompt, format it with the supplied args, and send it to the LLM.
 
     Args:

@@ -208,9 +208,10 @@ class BaseGraphRAG(Generic[GTEmbedding, GTHash, GTChunk, GTNode, GTEdge, GTId]):
                     "query": query,
                     "context": context_str
                 },
-                response_model=TAnswer,
+                response_model=None,
+                # response_model=TAnswer,
             )
-            answer = llm_response.answer
+            answer = llm_response.choices[0].message.content or ""
 
         return TQueryResponse[GTNode, GTEdge, GTHash, GTChunk](response=answer, context=context)
 
