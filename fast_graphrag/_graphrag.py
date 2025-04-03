@@ -28,6 +28,7 @@ class QueryParam:
     entities_max_tokens: int = field(default=4000)
     relations_max_tokens: int = field(default=3000)
     chunks_max_tokens: int = field(default=9000)
+    metadata: List[Optional[Dict[str, Any]]] | None = field(default=None)
 
 
 @dataclass
@@ -187,6 +188,24 @@ class BaseGraphRAG(Generic[GTEmbedding, GTHash, GTChunk, GTNode, GTEdge, GTId]):
                 response=PROMPTS["fail_response"], context=TContext([], [], [])
             )
 
+        if params.metadata:
+            logger.debug('filtering context')
+            filtered_chunks = [chunk for chunk in context.chunks if chunk[0].metadata in params.metadata] # type: ignore
+            filtered_chunks_set = {chunk[0].id for chunk in filtered_chunks}
+            filtered_relations = [
+                relation for relation in context.relations if set(relation[0].chunks) & filtered_chunks_set  # type: ignore
+            ]
+            enity_set = {
+                entity_name
+                for relation in filtered_relations
+                for entity_name in [relation[0].source, relation[0].target]
+            }
+            filtered_entities = [entity for entity in context.entities if entity[0].name in enity_set]
+
+            filtered_context = TContext(  # type: ignore
+                entities=filtered_entities, relations=filtered_relations, chunks=filtered_chunks
+            )
+            context = filtered_context # type: ignore
         # Ask LLM
         context_str = context.truncate(
             max_chars={
