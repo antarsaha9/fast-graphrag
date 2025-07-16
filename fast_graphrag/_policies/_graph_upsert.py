@@ -21,18 +21,34 @@ async def summarize_entity_description(
     """Summarize the given entity description."""
     if max_tokens is not None:
         raise NotImplementedError("Summarization with max tokens is not yet supported.")
-    # Prompt
-    entity_description_summarization_prompt = prompt
-
     # Extract entities and relationships
-    formatted_entity_description_summarization_prompt = entity_description_summarization_prompt.format(
-        description=description
-    )
-    new_description, _ = await llm.send_message(
-        prompt=formatted_entity_description_summarization_prompt,
-        response_model=TEntityDescription,
-        max_tokens=max_tokens,
-    )
+    system_key = prompt + '_system'
+    # Split system prompt/initial prompt pair
+    if system_key in PROMPTS:
+        # Use separate system and prompt entries if available.
+        entity_description_summarization_system = PROMPTS[system_key]
+        entity_description_summarization_prompt = PROMPTS[prompt + '_prompt']
+
+        formatted_system = entity_description_summarization_system.format(description=description)
+        formatted_prompt = entity_description_summarization_prompt.format(description=description)
+
+        new_description, _ = await llm.send_message(
+            system_prompt=formatted_system,
+            prompt=formatted_prompt,
+            response_model=TEntityDescription,
+            max_tokens=max_tokens,
+        )
+    else:
+        # Single prompt summarization
+        entity_description_summarization_prompt = PROMPTS[prompt]
+        formatted_entity_description_summarization_prompt = entity_description_summarization_prompt.format(
+            description=description
+        )
+        new_description, _ = await llm.send_message(
+            prompt=formatted_entity_description_summarization_prompt,
+            response_model=TEntityDescription,
+            max_tokens=max_tokens,
+        )
 
     return new_description.description
 
@@ -104,7 +120,7 @@ class NodeUpsertPolicy_SummarizeDescription(BaseNodeUpsertPolicy[TEntity, TId]):
     class Config:
         max_node_description_size: int = field(default=512)
         node_summarization_ratio: float = field(default=0.5)
-        node_summarization_prompt: str = field(default=PROMPTS["summarize_entity_descriptions"])
+        node_summarization_prompt: str = field(default="summarize_entity_descriptions")
         is_async: bool = field(default=True)
 
     config: Config = field(default_factory=Config)
@@ -316,9 +332,9 @@ class EdgeUpsertPolicy_UpsertValidAndMergeSimilarByLLM(BaseEdgeUpsertPolicy[TRel
         self, llm: BaseLLMService, target: BaseGraphStorage[GTNode, TRelation, TId], source_edges: Iterable[TRelation]
     ) -> Tuple[BaseGraphStorage[GTNode, TRelation, TId], Iterable[Tuple[TIndex, TRelation]]]:
         grouped_edges: Dict[Tuple[TId, TId], List[TRelation]] = defaultdict(lambda: [])
-        upserted_edges: List[List[Tuple[TIndex, TRelation]]] = []
-        new_edges: List[List[TRelation]] = []
-        to_delete_edges: List[List[TIndex]] = []
+        upserted_edges: Tuple[List[Tuple[TIndex, TRelation]], ...] = ()
+        new_edges: Tuple[List[TRelation], ...] = ()
+        to_delete_edges: Tuple[List[TIndex], ...] = ()
         for edge in source_edges:
             grouped_edges[(edge.source, edge.target)].append(edge)
 
@@ -337,6 +353,6 @@ class EdgeUpsertPolicy_UpsertValidAndMergeSimilarByLLM(BaseEdgeUpsertPolicy[TRel
             ]
             if len(tasks):
                 upserted_edges, new_edges, to_delete_edges = zip(*tasks)
-        await target.delete_edges_by_index(chain(*to_delete_edges))
-        new_indices = await target.insert_edges(chain(*new_edges))
+        await target.delete_edges_by_index(tuple(chain(*to_delete_edges)))
+        new_indices = await target.insert_edges(tuple(chain(*new_edges)))
         return target, chain(*upserted_edges, zip(new_indices, chain(*new_edges)))

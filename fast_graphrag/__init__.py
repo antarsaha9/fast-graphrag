@@ -31,6 +31,7 @@ from fast_graphrag._storage import (
     DefaultVectorStorage,
     DefaultVectorStorageConfig,
 )
+from fast_graphrag._storage._base import BaseGraphStorage
 from fast_graphrag._storage._namespace import Workspace
 from fast_graphrag._types import TChunk, TEmbedding, TEntity, THash, TId, TIndex, TRelation
 
@@ -63,7 +64,7 @@ class GraphRAG(BaseGraphRAG[TEmbedding, THash, TChunk, TEntity, TRelation, TId])
         llm_service: BaseLLMService = field(default_factory=lambda: DefaultLLMService())
         embedding_service: BaseEmbeddingService = field(default_factory=lambda: DefaultEmbeddingService())
 
-        graph_storage: DefaultGraphStorage[TEntity, TRelation, TId] = field(
+        graph_storage: BaseGraphStorage[TEntity, TRelation, TId] = field(
             default_factory=lambda: DefaultGraphStorage(DefaultGraphStorageConfig(node_cls=TEntity, edge_cls=TRelation))
         )
         entity_storage: DefaultVectorStorage[TIndex, TEmbedding] = field(
@@ -112,6 +113,7 @@ class GraphRAG(BaseGraphRAG[TEmbedding, THash, TChunk, TEntity, TRelation, TId])
             entity_storage=self.config.entity_storage,
             chunk_storage=self.config.chunk_storage,
             entity_ranking_policy=self.config.entity_ranking_policy,
+            relation_ranking_policy=self.config.relation_ranking_policy,
             chunk_ranking_policy=self.config.chunk_ranking_policy,
             node_upsert_policy=self.config.node_upsert_policy,
             edge_upsert_policy=self.config.edge_upsert_policy,
