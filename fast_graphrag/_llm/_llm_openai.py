@@ -90,6 +90,7 @@ class OpenAILLMService(BaseLLMService):
     system_prompt: str | None = None,
     history_messages: list[dict[str, str]] | None = None,
     response_model: Type[T_model] | None = None,
+    task_type: str | None = None,
     **kwargs: Any,
   ) -> Tuple[T_model, list[dict[str, str]]]:
     """Send a message to the language model and receive a response.
@@ -122,6 +123,19 @@ class OpenAILLMService(BaseLLMService):
               logger.debug(f"Added history messages: {history_messages}")
 
             messages.append({"role": "user", "content": prompt})
+
+            # Prepare extra_body with tags if available
+            extra_body = kwargs.get('extra_body', {})
+            tags = []
+            if self.tags:
+              tags.extend(self.tags)
+            if task_type:
+              tags.append(f"task:{task_type}")
+            if tags:
+              extra_body['metadata'] = extra_body.get('metadata', {})
+              extra_body['metadata']['tags'] = tags
+            if extra_body:
+              kwargs['extra_body'] = extra_body
 
             llm_response: T_model = await self.llm_async_client.chat.completions.create(
               model=model,
@@ -227,6 +241,15 @@ class OpenAIEmbeddingService(BaseEmbeddingService):
     async with self.embedding_max_requests_concurrent:
       async with self.embedding_per_minute_limiter:
         async with self.embedding_per_second_limiter:
+          # Prepare extra_body with tags if available
+          extra_body = {}
+          if self.tags:
+            extra_body['metadata'] = {'tags': self.tags}
+          
+          kwargs = {}
+          if extra_body:
+            kwargs['extra_body'] = extra_body
+            
           return await self.embedding_async_client.embeddings.create(
-            model=model, input=input, dimensions=self.embedding_dim, encoding_format="float"
+            model=model, input=input, dimensions=self.embedding_dim, encoding_format="float", **kwargs
           )

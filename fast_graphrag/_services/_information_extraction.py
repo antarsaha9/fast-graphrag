@@ -48,6 +48,7 @@ class DefaultInformationExtractionService(BaseInformationExtractionService[TChun
             llm=llm,
             format_kwargs=prompt_kwargs,
             response_model=TQueryEntities,
+            task_type="index",
         )
 
         return {
@@ -89,6 +90,7 @@ class DefaultInformationExtractionService(BaseInformationExtractionService[TChun
                     format_kwargs={},
                     response_model=TGraph,
                     history_messages=history,
+                    task_type="index",
                 )
 
                 # Combine new entities, relationships with previously obtained ones
@@ -106,6 +108,7 @@ class DefaultInformationExtractionService(BaseInformationExtractionService[TChun
                     format_kwargs={},
                     response_model=TGleaningStatus,
                     history_messages=history,
+                    task_type="index",
                 )
 
                 # If we are done parsing, stop gleaning
@@ -129,6 +132,7 @@ class DefaultInformationExtractionService(BaseInformationExtractionService[TChun
             llm=llm,
             format_kwargs=prompt_kwargs,
             response_model=TGraph,
+            task_type="index",
         )
 
         # Do gleaning

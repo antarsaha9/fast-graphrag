@@ -230,6 +230,7 @@ class BaseGraphRAG(Generic[GTEmbedding, GTHash, GTChunk, GTNode, GTEdge, GTId]):
                     "context": context_str
                 },
                 response_model=response_model,
+                task_type="query",
             )
             if response_model is None:
                 answer = llm_response.answer

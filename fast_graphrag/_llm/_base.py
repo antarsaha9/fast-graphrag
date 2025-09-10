@@ -3,7 +3,7 @@
 import os
 import re
 from dataclasses import dataclass, field
-from typing import Any, Optional, Tuple, Type, TypeVar, Union
+from typing import Any, List, Optional, Tuple, Type, TypeVar, Union
 
 import numpy as np
 from pydantic import BaseModel
@@ -21,6 +21,7 @@ async def format_and_send_prompt(
     llm: "BaseLLMService",
     format_kwargs: dict[str, Any],
     response_model: Type[T_model] | None = None,
+    task_type: str | None = None,
     **args: Any,
 ) -> Tuple[Union[T_model, ChatCompletion], list[dict[str, str]]]:
   """Get a prompt, format it with the supplied args, and send it to the LLM.
@@ -54,13 +55,13 @@ async def format_and_send_prompt(
     formatted_system = system.format(**format_kwargs)
     formatted_prompt = prompt.format(**format_kwargs)
     return await llm.send_message(
-      system_prompt=formatted_system, prompt=formatted_prompt, response_model=response_model, **args
+      system_prompt=formatted_system, prompt=formatted_prompt, response_model=response_model, task_type=task_type, **args
     )
   else:
     # Default: use the single prompt entry
     prompt = PROMPTS[prompt_key]
     formatted_prompt = prompt.format(**format_kwargs)
-    return await llm.send_message(prompt=formatted_prompt, response_model=response_model, **args)
+    return await llm.send_message(prompt=formatted_prompt, response_model=response_model, task_type=task_type, **args)
 
 
 @dataclass
@@ -77,6 +78,7 @@ class BaseLLMService:
   rate_limit_concurrency: bool = field(default=True)
   rate_limit_per_minute: bool = field(default=False)
   rate_limit_per_second: bool = field(default=False)
+  tags: Optional[List[str]] = field(default=None)
 
   def count_tokens(self, text: str) -> int:
     """Returns the number of tokens for a given text using the encoding appropriate for the model."""
@@ -97,6 +99,7 @@ class BaseLLMService:
     system_prompt: str | None = None,
     history_messages: list[dict[str, str]] | None = None,
     response_model: Type[T_model] | None = None,
+    task_type: str | None = None,
     **kwargs: Any,
   ) -> Tuple[T_model, list[dict[str, str]]]:
     """Send a message to the language model and receive a response.
@@ -129,6 +132,7 @@ class BaseEmbeddingService:
   rate_limit_concurrency: bool = field(default=True)
   rate_limit_per_minute: bool = field(default=True)
   rate_limit_per_second: bool = field(default=False)
+  tags: Optional[List[str]] = field(default=None)
 
   embedding_async_client: Any = field(init=False, default=None)
 
