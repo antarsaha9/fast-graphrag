@@ -37,7 +37,9 @@ class HNSWVectorStorage(BaseVectorStorage[GTId, GTEmbedding]):
 
     @property
     def max_size(self) -> int:
-        return self._index.get_max_elements() or self.INITIAL_MAX_ELEMENTS
+        if self._index is None:
+            return self.INITIAL_MAX_ELEMENTS
+        return self._index.get_max_elements()
 
     async def upsert(
         self,
@@ -53,6 +55,9 @@ class HNSWVectorStorage(BaseVectorStorage[GTId, GTEmbedding]):
             metadata is None or (len(metadata) == len(ids))
         ), "ids, embeddings, and metadata (if provided) must have the same length"
 
+        if self.max_size == 0:
+            self._index.resize_index(self.INITIAL_MAX_ELEMENTS)
+            
         if self.size + len(embeddings) >= self.max_size:
             new_size = self.max_size * 2
             while self.size + len(embeddings) >= new_size:
